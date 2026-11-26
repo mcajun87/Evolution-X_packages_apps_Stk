@@ -1,0 +1,46 @@
+name: Sync from upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'mcajun87'
+
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Merge upstream
+        env:
+          UPSTREAM_URL: "https://github.com/Evolution-X/packages_apps_Stk"
+          UPSTREAM_BRANCH: "bka"
+          TARGET_BRANCH: "bka"
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream "$UPSTREAM_URL" 2>/dev/null || git remote set-url upstream "$UPSTREAM_URL"
+          git fetch upstream "$UPSTREAM_BRANCH" --no-tags
+          git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+
+          if ! git merge --no-edit "upstream/$UPSTREAM_BRANCH"; then
+            echo "::error::代码冲突，无法自动合并，请手动检查。"
+            exit 1
+          fi
+
+          git push origin "HEAD:$TARGET_BRANCH"
